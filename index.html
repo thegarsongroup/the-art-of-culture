@@ -652,7 +652,7 @@ footer.site-foot::before { content: ""; display: block; height: 8px; background:
             <div class="field"><label for="i-school">School</label><input id="i-school" name="school" autocomplete="organization"></div>
           </div>
           <button class="btn" type="submit">Send me the details</button>
-          <p class="note" data-msg hidden>Mockup only: nothing was saved. On the real site, this goes to your Google Sheet.</p>
+          <p class="note" data-msg hidden></p>
           <div class="form-sign">
             <span class="flagbar"></span>
             <span class="wordmark"><span class="l1">The <b>Art</b></span><span class="l2"><b>of</b>Culture</span></span>
@@ -694,7 +694,7 @@ footer.site-foot::before { content: ""; display: block; height: 8px; background:
           </div>
         </fieldset>
         <button class="btn" type="submit">Join the waitlist</button>
-        <p class="note" data-msg hidden>Mockup only: nothing was saved. On the real site, this goes to your Google Sheet.</p>
+        <p class="note" data-msg hidden></p>
         <div class="form-sign">
           <span class="flagbar"></span>
           <span class="wordmark"><span class="l1">The <b>Art</b></span><span class="l2"><b>of</b>Culture</span></span>
@@ -773,34 +773,43 @@ footer.site-foot::before { content: ""; display: block; height: 8px; background:
     infoForm.scrollIntoView({ block: "center" });
   });
 
-  // ---- Forms → Google Sheet ----
-  // Paste the Apps Script "Web app" URL here. While it is empty, forms only show a preview message.
-  var SHEET_URL = "";
+  // ---- Forms → Google Forms (thegarsongroup@gmail.com) ----
+  // Each website field is sent to the matching question ("entry.<id>") of a published Google Form.
+  var GOOGLE_FORMS = {
+    wl: {
+      action: "https://docs.google.com/forms/d/e/1FAIpQLSe-oauCWekZR3Ttfr_0HcvKvasxVRih15uxw0xxK35lKSmICg/formResponse",
+      fields: { name: "1543973052", email: "200787352", phone: "359681569", city: "556949864", age: "2087603324", interests: "1471989973" }
+    },
+    "info-form": {
+      action: "https://docs.google.com/forms/d/e/1FAIpQLSfWN7LpXiqphANkhgp53UPQnmd8vR69KLTPNtnxOQLSuekPGg/formResponse",
+      fields: { name: "1980877637", email: "671528005", age: "217009907", school: "1788654211" }
+    }
+  };
+  var ITEM_NAMES = { book: "Book", lunch: "Lunch Bag", bottle: "Water Bottle", phone: "Phone Case", journal: "Journal", clock: "Alarm Clock", duffle: "Duffle Bag" };
   document.querySelectorAll("form.panel").forEach(function (f) {
     var msg = f.querySelector("[data-msg]");
     var btn = f.querySelector("button[type=submit]");
+    var target = GOOGLE_FORMS[f.id];
     f.addEventListener("submit", function (e) {
       e.preventDefault();
-      var data = new FormData(f);
-      if (!data.get("name") || !data.get("email")) {
-        msg.textContent = "Please enter at least your name and email.";
+      var values = {};
+      f.querySelectorAll("input[name]").forEach(function (i) { values[i.name] = i.value.trim(); });
+      if (!values.name || !values.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(values.email)) {
+        msg.textContent = "Please enter your name and a valid email address.";
         msg.hidden = false;
         return;
       }
-      data.append("form", f.id === "wl" ? "Waitlist" : "Scholarship Info");
       if (f.id === "wl") {
         var items = [];
-        f.querySelectorAll(".checks input:checked").forEach(function (c) { items.push(c.value); });
-        data.append("interests", items.join(", "));
+        f.querySelectorAll(".checks input:checked").forEach(function (c) { items.push(ITEM_NAMES[c.value] || c.value); });
+        values.interests = items.join(", ");
       }
-      if (!SHEET_URL) {
-        msg.textContent = "Preview only: nothing was saved. Once the Google Sheet is connected, this goes straight to it.";
-        msg.hidden = false;
-        return;
-      }
+      var body = new URLSearchParams();
+      Object.keys(target.fields).forEach(function (k) { body.append("entry." + target.fields[k], values[k] || ""); });
       btn.disabled = true;
       btn.textContent = "Sending…";
-      fetch(SHEET_URL, { method: "POST", body: data, mode: "no-cors" })
+      // Google Forms doesn't allow reading its reply from another site, so a sent request counts as success.
+      fetch(target.action, { method: "POST", body: body, mode: "no-cors" })
         .then(function () {
           f.reset();
           msg.textContent = f.id === "wl"
